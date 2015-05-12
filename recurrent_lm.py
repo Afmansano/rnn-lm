@@ -52,7 +52,25 @@ class LanguageModel(ComponentBase):
         ###################
         # RECURRENT WEIGHTS
         ###################
-        self.W_emb = add_to_params(self.params, theano.shared(value=NormalInit(self.rng, self.idim, self.rankdim), name='W_emb'))
+
+        # Build word embeddings, which are shared throughout the model
+        if self.initialize_from_pretrained_word_embeddings:
+            # Load pretrained word embeddings from pickled file
+            logger.debug("Loading pretrained word embeddings")
+            pretrained_embeddings = cPickle.load(open(self.pretrained_word_embeddings_file, 'r'))
+
+            # Check all dimensions match from the pretrained embeddings
+            assert(self.idim == pretrained_embeddings[0].shape[0])
+            assert(self.rankdim == pretrained_embeddings[0].shape[1])
+            assert(self.idim == pretrained_embeddings[1].shape[0])
+            assert(self.rankdim == pretrained_embeddings[1].shape[1])
+
+            self.W_emb_pretrained_mask = theano.shared(pretrained_embeddings[1].astype(numpy.float32), name='W_emb_mask')
+            self.W_emb = add_to_params(self.params, theano.shared(value=pretrained_embeddings[0].astype(numpy.float32), name='W_emb'))
+        else:
+            # Initialize word embeddings randomly
+            self.W_emb = add_to_params(self.params, theano.shared(value=NormalInit(self.rng, self.idim, self.rankdim), name='W_emb'))
+
         self.W_in = add_to_params(self.params, theano.shared(value=NormalInit(self.rng, self.rankdim, self.qdim), name='W_in'))
         self.W_hh = add_to_params(self.params, theano.shared(value=OrthogonalInit(self.rng, self.qdim, self.qdim), name='W_hh'))
         self.b_hh = add_to_params(self.params, theano.shared(value=np.zeros((self.qdim,), dtype='float32'), name='b_hh'))
@@ -276,6 +294,14 @@ class RecurrentLM(Model):
         for p, g in grads.items():
             clip_grads.append((p, T.switch(notfinite, numpy.float32(.1) * p, g * normalization)))
         grads = OrderedDict(clip_grads)
+
+        if self.initialize_from_pretrained_word_embeddings and self.fix_pretrained_word_embeddings:
+            # Keep pretrained word embeddings fixed
+            logger.debug("Will use mask to fix pretrained word embeddings")
+            grads[self.language_model.W_emb] = grads[self.language_model.W_emb] * self.language_model.W_emb_pretrained_mask
+
+        else:
+            logger.debug("Will train all word embeddings")
 
         if self.updater == 'adagrad':
             updates = Adagrad(grads, self.lr)  

@@ -37,7 +37,12 @@ def prototype_state():
     # Early stopping configuration
     state['patience'] = 5
     state['cost_threshold'] = 1.003
-    
+
+    # Initialization configuration
+    state['initialize_from_pretrained_word_embeddings'] = False
+    state['pretrained_word_embeddings_file'] = ''
+    state['fix_pretrained_word_embeddings'] = False    
+
     # ----- TRAINING METHOD -----
     # Choose optimization algorithm
     state['updater'] = 'adam'
@@ -91,11 +96,15 @@ def prototype_test():
     state['deep_out'] = True 
     state['maxout_out'] = False 
 
-    #
-    state['qdim'] = 5
+    # Handle pretrained word embeddings. Using this requires rankdim=10
+    state['initialize_from_pretrained_word_embeddings'] = True
+    state['pretrained_word_embeddings_file'] = './tests/data/Random_WordEmb.pkl' 
+    state['fix_pretrained_word_embeddings'] = True
+
+    # Dimensionality of hidden state space
+    state['qdim'] = 10
     # Dimensionality of low-rank approximation
-    state['rankdim'] = 5
-    # 
+    state['rankdim'] = 10
 
     state['bs'] = 10
     state['seqlen'] = 50
